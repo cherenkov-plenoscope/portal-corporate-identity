@@ -11,14 +11,14 @@ from io import BytesIO
 from skimage import io
 import json_numpy
 
-WORKD_DIR = os.path.join("examples", "visual")
-SCENERY_PATH = os.path.join(WORKD_DIR, "scenery.json")
-VISUAL_CONFIG_PATH = os.path.join(WORKD_DIR, "visual_config.json")
 MERLICT_CAMERA_SERVER = os.path.join(
     "build", "merlict", "merlict-cameraserver"
 )
-os.makedirs(WORKD_DIR, exist_ok=True)
+WORKD_DIR = os.path.join("portal-corporate-identity", "images", "work")
+SCENERY_PATH = os.path.join(WORKD_DIR, "scenery.json")
+VISUAL_CONFIG_PATH = os.path.join(WORKD_DIR, "visual_config.json")
 
+os.makedirs(WORKD_DIR, exist_ok=True)
 
 def read_ppm_image(fstream):
     magic = fstream.readline()
