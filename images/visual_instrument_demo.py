@@ -1,4 +1,8 @@
 #! /usr/bin/env python
+"""
+I make multiple renderings of Portal.
+I am expected to run in the ./starter_kit
+"""
 import cable_robo_mount as rs
 import os
 import subprocess as sp
