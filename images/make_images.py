@@ -4,11 +4,10 @@ I make multiple renderings of Portal.
 I am expected to run in the ./starter_kit
 """
 import cable_robo_mount as rs
+import merlict_camera_server
 import os
-import subprocess as sp
+import subprocess
 import numpy as np
-from io import BytesIO
-from skimage import io
 import json_numpy
 
 MERLICT_CAMERA_SERVER = os.path.join(
@@ -19,70 +18,6 @@ SCENERY_PATH = os.path.join(WORKD_DIR, "scenery.json")
 VISUAL_CONFIG_PATH = os.path.join(WORKD_DIR, "visual_config.json")
 
 os.makedirs(WORKD_DIR, exist_ok=True)
-
-def read_ppm_image(fstream):
-    magic = fstream.readline()
-    assert magic[0] == 80
-    assert magic[1] == 54
-    comment = fstream.readline()
-    image_size = fstream.readline()
-    num_columns, num_rows = image_size.decode().split()
-    num_columns = int(num_columns)
-    num_rows = int(num_rows)
-    max_color = int(fstream.readline().decode())
-    assert max_color == 255
-    count = num_columns * num_rows * 3
-    raw = np.frombuffer(fstream.read(count), dtype=np.uint8)
-    img = raw.reshape((num_rows, num_columns, 3))
-    return img
-
-
-def camera_command(
-    position,
-    orientation,
-    object_distance,
-    sensor_size,
-    field_of_view,
-    f_stop,
-    num_columns,
-    num_rows,
-    noise_level,
-):
-    """
-    Returns a binary command-string to be fed into merlict's cmaera-server via
-    std-in.
-
-    Parameters
-    ----------
-
-        noise_level             From 0 (no noise) to 255 (strong noise).
-                                Lower noise_levels give better looking images
-                                but take longer to be computed. Strong
-                                noise_levels are fast to compute.
-    """
-    fout = BytesIO()
-    fout.write(np.uint64(645).tobytes())  # MAGIC
-
-    fout.write(np.float64(position[0]).tobytes())  # position
-    fout.write(np.float64(position[1]).tobytes())
-    fout.write(np.float64(position[2]).tobytes())
-
-    fout.write(np.float64(orientation[0]).tobytes())  # Tait–Bryan-angles
-    fout.write(np.float64(orientation[1]).tobytes())
-    fout.write(np.float64(orientation[2]).tobytes())
-
-    fout.write(np.float64(object_distance).tobytes())
-    fout.write(np.float64(sensor_size).tobytes())  # sensor-size
-    fout.write(np.float64(field_of_view).tobytes())  # fov
-    fout.write(np.float64(f_stop).tobytes())  # f-stop
-
-    fout.write(np.uint64(num_columns).tobytes())
-    fout.write(np.uint64(num_rows).tobytes())
-    fout.write(np.uint64(noise_level).tobytes())
-
-    fout.seek(0)
-    return fout.read()
-
 
 acp_config = {
     "pointing": {"azimuth": 20.0, "zenith_distance": 30.0,},
@@ -277,29 +212,29 @@ image_configs = {
     },
 }
 
-call = [
-    MERLICT_CAMERA_SERVER,
-    "--scenery",
-    SCENERY_PATH,
-    "--config",
-    VISUAL_CONFIG_PATH,
-]
+server = merlict_camera_server.CameraServer(
+    merlict_camera_server_path=MERLICT_CAMERA_SERVER,
+    scenery_path=SCENERY_PATH,
+    visual_config_path=VISUAL_CONFIG_PATH,
+)
+print("camera-server start")
 
-merlict = sp.Popen(call, stdin=sp.PIPE, stdout=sp.PIPE)
 for imgkey in image_configs:
-    imgstempath = os.path.join(WORKD_DIR, "{:s}".format(imgkey))
-    imgpath = imgstempath + ".tiff"
-    imgcfgpath = imgstempath + ".json"
+    img_stem_path = os.path.join(WORKD_DIR, "{:s}".format(imgkey))
+    img_tiff_path = img_stem_path + ".tiff"
+    img_jpeg_path = img_stem_path + ".jpg"
+    img_json_path = img_stem_path + ".json"
 
-    if not os.path.exists(imgpath):
+    if not os.path.exists(img_tiff_path):
+        print("camera-server render", img_tiff_path)
         full_config = dict(image_general_config)
         full_config.update(image_configs[imgkey])
-        w = merlict.stdin.write(camera_command(**full_config))
-        w = merlict.stdin.flush()
-        img = read_ppm_image(merlict.stdout)
-        io.imsave(imgpath, img)
-        json_numpy.write(imgcfgpath, full_config)
 
-    sp.call(["convert", imgpath, imgstempath + ".jpg"])
+        json_numpy.write(img_json_path, full_config)
+        server.render_image_and_write_to_tiff(
+            image_config=full_config, path=img_tiff_path,
+        )
+        subprocess.call(["convert", img_tiff_path, img_jpeg_path])
+print("camera-server done")
 
-merlict.kill()
+server.__exit__()
