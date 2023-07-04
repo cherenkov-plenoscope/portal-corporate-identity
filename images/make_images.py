@@ -8,7 +8,7 @@ import merlict_camera_server
 import os
 import subprocess
 import numpy as np
-import json_numpy
+import json_utils
 
 MERLICT_CAMERA_SERVER = os.path.join(
     "build", "merlict", "merlict-cameraserver"
@@ -148,7 +148,7 @@ if not os.path.exists(SCENERY_PATH):
     reflector = rs.factory.generate_reflector(geometry)
     out = rs.mctracer_bridge.merlict_json.visual_scenery(reflector)
     rs.mctracer_bridge.merlict_json.write_json(out, SCENERY_PATH)
-    json_numpy.write(SCENERY_PATH, out)
+    json_utils.write(SCENERY_PATH, out)
 
 
 merlict_visual_config = {
@@ -169,7 +169,7 @@ merlict_visual_config = {
     "photon_trajectories": {"radius": 0.15},
 }
 
-json_numpy.write(VISUAL_CONFIG_PATH, merlict_visual_config)
+json_utils.write(VISUAL_CONFIG_PATH, merlict_visual_config)
 
 image_general_config = {
     "sensor_size": 0.3,
@@ -230,7 +230,7 @@ for imgkey in image_configs:
         full_config = dict(image_general_config)
         full_config.update(image_configs[imgkey])
 
-        json_numpy.write(img_json_path, full_config)
+        json_utils.write(img_json_path, full_config)
         server.render_image_and_write_to_tiff(
             image_config=full_config, path=img_tiff_path,
         )
