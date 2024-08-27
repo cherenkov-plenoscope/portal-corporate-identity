@@ -11,16 +11,21 @@ import numpy as np
 import json_utils
 
 MERLICT_CAMERA_SERVER = os.path.join(
-    "build", "merlict", "merlict-cameraserver"
+    "build", "merlict_development_kit", "merlict-cameraserver"
 )
 WORKD_DIR = os.path.join("portal-corporate-identity", "images", "work")
 SCENERY_PATH = os.path.join(WORKD_DIR, "scenery.json")
 VISUAL_CONFIG_PATH = os.path.join(WORKD_DIR, "visual_config.json")
 
+DARKMODE = True
+
 os.makedirs(WORKD_DIR, exist_ok=True)
 
 acp_config = {
-    "pointing": {"azimuth": 20.0, "zenith_distance": 30.0,},
+    "pointing": {
+        "azimuth": 20.0,
+        "zenith_distance": 30.0,
+    },
     "camera": {
         "expected_imaging_system_focal_length": 106.05,
         "expected_imaging_system_aperture_radius": 35.35,
@@ -147,9 +152,31 @@ if not os.path.exists(SCENERY_PATH):
     geometry = rs.Geometry(acp_config)
     reflector = rs.factory.generate_reflector(geometry)
     out = rs.mctracer_bridge.merlict_json.visual_scenery(reflector)
+
+    if DARKMODE:
+        out["colors"] = [
+            {"name": "facet_color", "rgb": [128, 128, 128]},
+            {"name": "pale_blue_white", "rgb": [225, 255, 255]},
+            {"name": "desert_sand", "rgb": [25, 12, 0]},
+            {"name": "concrete_grey", "rgb": [220, 220, 220]},
+            {"name": "cable_color", "rgb": [255, 220, 220]},
+        ]
+    else:
+        out["colors"] = [
+            {"name": "facet_color", "rgb": [75, 75, 75]},
+            {"name": "pale_blue_white", "rgb": [225, 255, 255]},
+            {"name": "desert_sand", "rgb": [204, 102, 0]},
+            {"name": "concrete_grey", "rgb": [128, 128, 128]},
+            {"name": "cable_color", "rgb": [140, 128, 128]},
+        ]
+
     rs.mctracer_bridge.merlict_json.write_json(out, SCENERY_PATH)
     json_utils.write(SCENERY_PATH, out)
 
+if DARKMODE:
+    SKY_DOME_COLOR = [0, 0, 0]
+else:
+    SKY_DOME_COLOR = [255, 255, 255]
 
 merlict_visual_config = {
     "max_interaction_depth": 41,
@@ -165,18 +192,19 @@ merlict_visual_config = {
         "on": True,
         "incoming_direction": [-0.15, -0.2, 1.0],
     },
-    "sky_dome": {"path": "", "color": [255, 255, 255]},
+    "sky_dome": {"path": "", "color": SKY_DOME_COLOR},
     "photon_trajectories": {"radius": 0.15},
 }
 
 json_utils.write(VISUAL_CONFIG_PATH, merlict_visual_config)
 
+RRR = 8
 image_general_config = {
     "sensor_size": 0.3,
     "f_stop": 0.95,
-    "num_columns": 512 * 2,
-    "num_rows": 288 * 2,
-    "noise_level": 200,
+    "num_columns": 480 * RRR,
+    "num_rows": 270 * RRR,
+    "noise_level": 50,
 }
 
 image_configs = {
@@ -224,6 +252,7 @@ for imgkey in image_configs:
     img_tiff_path = img_stem_path + ".tiff"
     img_jpeg_path = img_stem_path + ".jpg"
     img_json_path = img_stem_path + ".json"
+    img_png_path = img_stem_path + ".png"
 
     if not os.path.exists(img_tiff_path):
         print("camera-server render", img_tiff_path)
@@ -232,9 +261,28 @@ for imgkey in image_configs:
 
         json_utils.write(img_json_path, full_config)
         server.render_image_and_write_to_tiff(
-            image_config=full_config, path=img_tiff_path,
+            image_config=full_config,
+            path=img_tiff_path,
         )
+    if not os.path.exists(img_jpeg_path):
         subprocess.call(["convert", img_tiff_path, img_jpeg_path])
+
+    if not os.path.exists(img_png_path):
+        if DARKMODE:
+            background_color = "#000000"
+        else:
+            background_color = "#ffffff"
+        subprocess.call(
+            [
+                "convert",
+                img_tiff_path,
+                "-transparent",
+                background_color,
+                "-gamma",
+                "1.33",
+                img_png_path,
+            ]
+        )
 print("camera-server done")
 
 server.__exit__()
