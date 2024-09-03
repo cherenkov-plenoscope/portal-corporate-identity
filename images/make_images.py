@@ -17,9 +17,23 @@ WORKD_DIR = os.path.join("portal-corporate-identity", "images", "work")
 SCENERY_PATH = os.path.join(WORKD_DIR, "scenery.json")
 VISUAL_CONFIG_PATH = os.path.join(WORKD_DIR, "visual_config.json")
 
-DARKMODE = True
-
+DARKMODE = False
+SKYDOME_PATH = os.path.join(
+    "..",
+    "..",
+    "..",
+    "merlict_development_kit",
+    "merlict_viewer",
+    "apps",
+    "examples",
+    "chile_night_sky.ppm",
+)
+SKYDOME_PATH = ""
+RRR = 8
 os.makedirs(WORKD_DIR, exist_ok=True)
+ppp = os.path.join(os.path.dirname(VISUAL_CONFIG_PATH), SKYDOME_PATH)
+if SKYDOME_PATH != "" and not os.path.isfile(ppp):
+    print("Warning: Can not find: ", ppp)
 
 acp_config = {
     "pointing": {
@@ -192,13 +206,13 @@ merlict_visual_config = {
         "on": True,
         "incoming_direction": [-0.15, -0.2, 1.0],
     },
-    "sky_dome": {"path": "", "color": SKY_DOME_COLOR},
+    "sky_dome": {"path": SKYDOME_PATH, "color": SKY_DOME_COLOR},
     "photon_trajectories": {"radius": 0.15},
 }
 
 json_utils.write(VISUAL_CONFIG_PATH, merlict_visual_config)
 
-RRR = 8
+
 image_general_config = {
     "sensor_size": 0.3,
     "f_stop": 0.95,
