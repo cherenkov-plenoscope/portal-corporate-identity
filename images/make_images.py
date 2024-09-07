@@ -1,8 +1,9 @@
 #! /usr/bin/env python
 """
 I make multiple renderings of Portal.
-I am expected to run in the ./starter_kit
+I am expected to run in the ./starter_kit/packages
 """
+import argparse
 import cable_robo_mount as rs
 import merlict_camera_server
 import os
@@ -10,35 +11,63 @@ import subprocess
 import numpy as np
 import json_utils
 
-MERLICT_CAMERA_SERVER = os.path.join(
-    "build", "merlict_development_kit", "merlict-cameraserver"
+parser = argparse.ArgumentParser(
+    prog="make_images.py",
+    description="Renders images of the Portal Cherenkov plenoscope",
 )
-WORKD_DIR = os.path.join("portal-corporate-identity", "images", "work")
-SCENERY_PATH = os.path.join(WORKD_DIR, "scenery.json")
-VISUAL_CONFIG_PATH = os.path.join(WORKD_DIR, "visual_config.json")
+parser.add_argument(
+    "--merlict-camera-server",
+    default=os.path.join(
+        "build", "merlict_development_kit", "merlict-cameraserver"
+    ),
+    type=str,
+)
+parser.add_argument(
+    "--work-dir",
+    default=os.path.join("portal-corporate-identity", "images", "work"),
+    type=str,
+)
+parser.add_argument(
+    "--sky-dome",
+    default="",
+    type=str,
+)
+parser.add_argument(
+    "--images",
+    default=None,
+    type=str,
+)
+parser.add_argument(
+    "--azimuth-deg",
+    default=20.0,
+    type=float,
+)
+parser.add_argument(
+    "--zenith-distance-deg",
+    default=30.0,
+    type=float,
+)
 
-DARKMODE = False
-SKYDOME_PATH = os.path.join(
-    "..",
-    "..",
-    "..",
-    "merlict_development_kit",
-    "merlict_viewer",
-    "apps",
-    "examples",
-    "chile_night_sky.ppm",
-)
-SKYDOME_PATH = ""
-RRR = 8
-os.makedirs(WORKD_DIR, exist_ok=True)
-ppp = os.path.join(os.path.dirname(VISUAL_CONFIG_PATH), SKYDOME_PATH)
-if SKYDOME_PATH != "" and not os.path.isfile(ppp):
+parser.add_argument("--resolution", type=int, default=1)
+parser.add_argument("-d", "--dark", action="store_true")
+
+args = parser.parse_args()
+workd_dir = args.work_dir
+
+
+os.makedirs(workd_dir, exist_ok=True)
+
+scenery_path = os.path.join(workd_dir, "scenery.json")
+visual_config_path = os.path.join(workd_dir, "visual_config.json")
+
+ppp = os.path.join(os.path.dirname(visual_config_path), args.sky_dome)
+if args.sky_dome != "" and not os.path.isfile(ppp):
     print("Warning: Can not find: ", ppp)
 
 acp_config = {
     "pointing": {
-        "azimuth": 20.0,
-        "zenith_distance": 30.0,
+        "azimuth": args.azimuth_deg,
+        "zenith_distance": args.zenith_distance_deg,
     },
     "camera": {
         "expected_imaging_system_focal_length": 106.05,
@@ -162,12 +191,12 @@ acp_config = {
     },
 }
 
-if not os.path.exists(SCENERY_PATH):
+if not os.path.exists(scenery_path):
     geometry = rs.Geometry(acp_config)
     reflector = rs.factory.generate_reflector(geometry)
     out = rs.mctracer_bridge.merlict_json.visual_scenery(reflector)
 
-    if DARKMODE:
+    if args.dark:
         out["colors"] = [
             {"name": "facet_color", "rgb": [128, 128, 128]},
             {"name": "pale_blue_white", "rgb": [225, 255, 255]},
@@ -184,13 +213,13 @@ if not os.path.exists(SCENERY_PATH):
             {"name": "cable_color", "rgb": [140, 128, 128]},
         ]
 
-    rs.mctracer_bridge.merlict_json.write_json(out, SCENERY_PATH)
-    json_utils.write(SCENERY_PATH, out)
+    rs.mctracer_bridge.merlict_json.write_json(out, scenery_path)
+    json_utils.write(scenery_path, out)
 
-if DARKMODE:
-    SKY_DOME_COLOR = [0, 0, 0]
+if args.dark:
+    sky_dome_color = [0, 0, 0]
 else:
-    SKY_DOME_COLOR = [255, 255, 255]
+    sky_dome_color = [255, 255, 255]
 
 merlict_visual_config = {
     "max_interaction_depth": 41,
@@ -206,18 +235,18 @@ merlict_visual_config = {
         "on": True,
         "incoming_direction": [-0.15, -0.2, 1.0],
     },
-    "sky_dome": {"path": SKYDOME_PATH, "color": SKY_DOME_COLOR},
+    "sky_dome": {"path": args.sky_dome, "color": sky_dome_color},
     "photon_trajectories": {"radius": 0.15},
 }
 
-json_utils.write(VISUAL_CONFIG_PATH, merlict_visual_config)
+json_utils.write(visual_config_path, merlict_visual_config)
 
 
 image_general_config = {
     "sensor_size": 0.3,
     "f_stop": 0.95,
-    "num_columns": 480 * RRR,
-    "num_rows": 270 * RRR,
+    "num_columns": 480 * args.resolution,
+    "num_rows": 270 * args.resolution,
     "noise_level": 50,
 }
 
@@ -252,17 +281,28 @@ image_configs = {
         "object_distance": 2300,
         "field_of_view": np.deg2rad(1.063e01),
     },
+    "side_from_distance": {
+        "position": [2.182e03, 6.191e02, 8.434e00],
+        "orientation": np.deg2rad([0, -8.759e01 * 1.008, -1.959e02]),
+        "object_distance": 2300,
+        "field_of_view": np.deg2rad(1.063e01 * 0.67),
+    },
 }
 
 server = merlict_camera_server.CameraServer(
-    merlict_camera_server_path=MERLICT_CAMERA_SERVER,
-    scenery_path=SCENERY_PATH,
-    visual_config_path=VISUAL_CONFIG_PATH,
+    merlict_camera_server_path=args.merlict_camera_server,
+    scenery_path=scenery_path,
+    visual_config_path=visual_config_path,
 )
 print("camera-server start")
 
-for imgkey in image_configs:
-    img_stem_path = os.path.join(WORKD_DIR, "{:s}".format(imgkey))
+if args.images is None:
+    image_keys = [imgkey for imgkey in image_configs]
+else:
+    image_keys = args.images.split(",")
+
+for imgkey in image_keys:
+    img_stem_path = os.path.join(workd_dir, "{:s}".format(imgkey))
     img_tiff_path = img_stem_path + ".tiff"
     img_jpeg_path = img_stem_path + ".jpg"
     img_json_path = img_stem_path + ".json"
@@ -282,7 +322,7 @@ for imgkey in image_configs:
         subprocess.call(["convert", img_tiff_path, img_jpeg_path])
 
     if not os.path.exists(img_png_path):
-        if DARKMODE:
+        if args.dark:
             background_color = "#000000"
         else:
             background_color = "#ffffff"
