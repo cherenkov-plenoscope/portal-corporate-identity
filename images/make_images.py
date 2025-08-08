@@ -178,7 +178,7 @@ acp_config = {
             # so Cd very conservative 1.2.OK
             "wind_density": 1.25,
             # wind density.OK
-            "cpei": 1.5
+            "cpei": 1.5,
             # according to EC1-4 Z.7.3(freistehende Dächer) und Z. 7.2 Tab.7.4a
             # (big?, although a preciser definition is impossible), OK
         },
